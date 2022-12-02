@@ -1,4 +1,9 @@
-﻿using System.Diagnostics;
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
+// This file adapted from https://github.com/dotnet/aspnetcore/blob/792e021af928d435276ffdb2149082ea3d8ce9c5/src/Mvc/Mvc.ViewFeatures/src/RazorComponents/HtmlRenderer.cs
+
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.IO.Pipelines;
 using Microsoft.AspNetCore.Components.RenderTree;
