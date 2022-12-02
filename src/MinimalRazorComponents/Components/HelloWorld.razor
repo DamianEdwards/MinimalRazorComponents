@@ -1,0 +1,15 @@
+﻿<LayoutView Layout="typeof(Layout)">
+    <h2>Hello World Component</h2>
+
+    <p>This was rendered from a Razor Component!</p>
+
+    @if (Message is not null)
+    {
+        <p>@Message</p>
+    }
+</LayoutView>
+
+@code {
+    [Parameter]
+    public string Message { get; set; } = "";
+}
