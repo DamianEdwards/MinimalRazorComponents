@@ -24,7 +24,7 @@ public static class BufferWriterExtensions
             }
 
             // Copy to pipe
-            var bytesWritten = Encoding.UTF8.GetBytes(encodedCharsSpan.AsSpan().Slice(0, charsWritten), bufferWriter);
+            var bytesWritten = Encoding.UTF8.GetBytes(encodedCharsSpan.AsSpan()[..charsWritten], bufferWriter);
 
             ArrayPool<char>.Shared.Return(encodedCharsSpan);
         }
