@@ -4,7 +4,7 @@ using MinimalRazorComponents.Infrastructure;
 namespace Microsoft.AspNetCore.Http.HttpResults;
 
 public class ComponentResult<TComponent> : IResult
-    where TComponent : IComponent, new()
+    where TComponent : IComponent
 {
     private IDictionary<string, object?>? _parameters;
 

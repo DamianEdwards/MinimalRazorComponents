@@ -1,0 +1,40 @@
+﻿@page "/form"
+
+@using Microsoft.AspNetCore.Mvc;
+
+<LayoutView Layout="typeof(Layout)">
+    <h1>Form Handling</h1>
+
+    <p>Fill out this form</p>
+
+    <form method="get">
+        <div class="mb-3">
+            <label for="email" class="form-label">Email address</label>
+            <input type="email" name="email" value="@Email" class="form-control" id="email" aria-describedby="emailHelp" />
+            <div id="emailHelp" class="form-text">We'll never share your email with anyone else.</div>
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" name="password" value="@Password" class="form-control" id="password" />
+        </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" name="check" checked="@Check" class="form-check-input" id="check" />
+            <label class="form-check-label" for="check">Check me out</label>
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+</LayoutView>
+
+@code {
+    [Parameter]
+    [FromQuery]
+    public string? Email { get; set; }
+
+    [Parameter]
+    [FromQuery]
+    public string? Password { get; set; }
+
+    [Parameter]
+    [FromQuery]
+    public bool? Check { get; set; }
+}
