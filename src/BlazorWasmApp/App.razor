@@ -1,0 +1,11 @@
+﻿@attribute [ClientComponent]
+
+<h2>Hello from WASM!</h2>
+
+<button @onclick="@(() => counter++)">Click Me!</button>
+
+<p>@counter</p>
+
+@code {
+    int counter;
+}

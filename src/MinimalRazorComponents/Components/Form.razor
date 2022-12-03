@@ -1,4 +1,5 @@
 ﻿@page "/form"
+@layout Layout
 
 @using Microsoft.AspNetCore.Mvc;
 
@@ -37,4 +38,6 @@
     [Parameter]
     [FromQuery]
     public bool? Check { get; set; }
+
+    
 }

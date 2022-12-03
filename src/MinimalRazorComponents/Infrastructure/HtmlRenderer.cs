@@ -43,6 +43,8 @@ internal sealed class HtmlRenderer : Renderer
         var frames = GetCurrentRenderTreeFrames(componentId);
         var newPosition = RenderFrames(context, frames, 0, frames.Count);
 
+        _writer.AppendHtml(@"<script src=""_framework/blazor.webassembly.js""></script>");
+
         // When to flush the writer?
         await _writer.FlushAsync();
     }
@@ -102,8 +104,20 @@ internal sealed class HtmlRenderer : Renderer
     private int RenderChildComponent(HtmlRenderingContext context, ArrayRange<RenderTreeFrame> frames, int position)
     {
         ref var frame = ref frames.Array[position];
-        var childFrames = GetCurrentRenderTreeFrames(frame.ComponentId);
-        RenderFrames(context, childFrames, 0, childFrames.Count);
+        var component = frame.Component;
+        
+        var isClient = component.GetType().GetCustomAttributes(false).Any(a => a.GetType().Name.Equals("ClientComponentAttribute", StringComparison.Ordinal));
+
+        if (isClient)
+        {
+            var marker = WebAssemblyComponentSerializer.SerializeInvocation(component.GetType(), ParameterView.Empty, false);
+            WebAssemblyComponentSerializer.AppendPreamble(_writer, marker);
+        }
+        else
+        {
+            var childFrames = GetCurrentRenderTreeFrames(frame.ComponentId);
+            RenderFrames(context, childFrames, 0, childFrames.Count);
+        }
         return position + frame.ComponentSubtreeLength;
     }
 
