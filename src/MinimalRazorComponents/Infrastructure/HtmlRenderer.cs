@@ -133,7 +133,7 @@ internal sealed class HtmlRenderer : Renderer
         WebAssemblyComponentSerializer.AppendPreamble(context.Writer, marker);
 
         // This is sync
-        InitializeStandardComponentServicesAsync(context.HttpContext).GetAwaiter().GetResult();
+        InitializeStandardComponentServices(context.HttpContext);
 
         try
         {
@@ -164,7 +164,7 @@ internal sealed class HtmlRenderer : Renderer
     private bool _initialized;
     private readonly object _lock = new();
 
-    private Task InitializeStandardComponentServicesAsync(HttpContext httpContext)
+    private void InitializeStandardComponentServices(HttpContext httpContext)
     {
         // This might not be the first component in the request we are rendering, so
         // we need to check if we already initialized the services in this request.
@@ -176,8 +176,6 @@ internal sealed class HtmlRenderer : Renderer
                 _initialized = true;
             }
         }
-
-        return Task.CompletedTask;
 
         static void InitializeCore(HttpContext httpContext)
         {
@@ -194,7 +192,9 @@ internal sealed class HtmlRenderer : Renderer
             // It's important that this is initialized since a component might try to restore state during prerendering
             // (which will obviously not work, but should not fail)
             var componentApplicationLifetime = httpContext.RequestServices.GetRequiredService<ComponentStatePersistenceManager>();
-            componentApplicationLifetime.RestoreStateAsync(new PrerenderComponentApplicationStore());
+            
+            // This is actually sync in the default implementation
+            componentApplicationLifetime.RestoreStateAsync(new PrerenderComponentApplicationStore()).GetAwaiter().GetResult();
         }
     }
 
