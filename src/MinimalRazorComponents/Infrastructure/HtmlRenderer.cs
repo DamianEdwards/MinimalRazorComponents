@@ -7,7 +7,11 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.RenderTree;
+using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.AspNetCore.Http.Extensions;
 
 namespace MinimalRazorComponents.Infrastructure;
 
@@ -31,23 +35,27 @@ internal sealed class HtmlRenderer : Renderer
 
     protected override Task UpdateDisplayAsync(in RenderBatch renderBatch) => CanceledRenderTask;
 
-    public async Task RenderComponentAsync(Type componentType, ParameterView initialParameters, IBufferWriter<byte> bufferWriter)
+    public async Task RenderComponentAsync(Type componentType, ParameterView initialParameters, HttpContext httpContext)
     {
         var component = InstantiateComponent(componentType);
         var componentId = AssignRootComponentId(component);
 
         await RenderRootComponentAsync(componentId, initialParameters);
 
-        var context = new HtmlRenderingContext(bufferWriter);
+        var context = new HtmlRenderingContext(httpContext.Response.BodyWriter, httpContext);
         var frames = GetCurrentRenderTreeFrames(componentId);
         var _ = RenderFrames(context, frames, 0, frames.Count);
 
-        bufferWriter.AppendHtml(@"<script src=""_framework/blazor.webassembly.js""></script>");
+        if (context.RequiresClientComponentScripts)
+        {
+            httpContext.Response.BodyWriter.AppendHtml(@"<script src=""_framework/blazor.webassembly.js""></script>");
+        }
     }
 
-    public Task RenderComponentAsync<TComponent>(ParameterView initialParameters, IBufferWriter<byte> bufferWriter) where TComponent : IComponent
+    public Task RenderComponentAsync<TComponent>(ParameterView initialParameters, HttpContext httpContext)
+        where TComponent : IComponent
     {
-        return RenderComponentAsync(typeof(TComponent), initialParameters, bufferWriter);
+        return RenderComponentAsync(typeof(TComponent), initialParameters, httpContext);
     }
 
     /// <inheritdoc />
@@ -106,9 +114,7 @@ internal sealed class HtmlRenderer : Renderer
 
         if (isClient)
         {
-            // TODO: Support pre-rendering client components
-            var marker = WebAssemblyComponentSerializer.SerializeInvocation(component.GetType(), ParameterView.Empty, false);
-            WebAssemblyComponentSerializer.AppendPreamble(context.Writer, marker);
+            PrerenderChildClientComponent(context, ref frame);
         }
         else
         {
@@ -116,6 +122,106 @@ internal sealed class HtmlRenderer : Renderer
             RenderFrames(context, childFrames, 0, childFrames.Count);
         }
         return position + frame.ComponentSubtreeLength;
+    }
+
+    private void PrerenderChildClientComponent(HtmlRenderingContext context, ref RenderTreeFrame frame)
+    {
+        var component = frame.Component;
+        var componentType = component.GetType();
+
+        var marker = WebAssemblyComponentSerializer.SerializeInvocation(componentType, ParameterView.Empty, prerendered: true);
+        WebAssemblyComponentSerializer.AppendPreamble(context.Writer, marker);
+
+        // This is sync
+        InitializeStandardComponentServicesAsync(context.HttpContext).GetAwaiter().GetResult();
+
+        try
+        {
+            var childFrames = GetCurrentRenderTreeFrames(frame.ComponentId);
+            RenderFrames(context, childFrames, 0, childFrames.Count);
+        }
+        catch (NavigationException navigationException)
+        {
+            // Navigation was attempted during prerendering.
+            if (context.HttpContext.Response.HasStarted)
+            {
+                // We can't perform a redirect as the server already started sending the response.
+                // This is considered an application error as the developer should buffer the response until
+                // all components have rendered.
+                throw new InvalidOperationException("A navigation command was attempted during prerendering after the server already started sending the response. " +
+                    "Navigation commands can not be issued during server-side prerendering after the response from the server has started. Applications must buffer the" +
+                    "response and avoid using features like FlushAsync() before all components on the page have been rendered to prevent failed navigation commands.", navigationException);
+            }
+
+            context.HttpContext.Response.Redirect(navigationException.Location);
+        }
+
+        WebAssemblyComponentSerializer.AppendEpilogue(context.Writer, marker);
+
+        context.RequiresClientComponentScripts = true;
+    }
+
+    private bool _initialized;
+    private readonly object _lock = new();
+
+    private Task InitializeStandardComponentServicesAsync(HttpContext httpContext)
+    {
+        // This might not be the first component in the request we are rendering, so
+        // we need to check if we already initialized the services in this request.
+        lock (_lock)
+        {
+            if (!_initialized)
+            {
+                InitializeCore(httpContext);
+                _initialized = true;
+            }
+        }
+
+        return Task.CompletedTask;
+
+        static void InitializeCore(HttpContext httpContext)
+        {
+            var navigationManager = (IHostEnvironmentNavigationManager)httpContext.RequestServices.GetRequiredService<NavigationManager>();
+            navigationManager?.Initialize(GetContextBaseUri(httpContext.Request), GetFullUri(httpContext.Request));
+
+            var authenticationStateProvider = httpContext.RequestServices.GetService<AuthenticationStateProvider>() as IHostEnvironmentAuthenticationStateProvider;
+            if (authenticationStateProvider != null)
+            {
+                var authenticationState = new AuthenticationState(httpContext.User);
+                authenticationStateProvider.SetAuthenticationState(Task.FromResult(authenticationState));
+            }
+
+            // It's important that this is initialized since a component might try to restore state during prerendering
+            // (which will obviously not work, but should not fail)
+            var componentApplicationLifetime = httpContext.RequestServices.GetRequiredService<ComponentStatePersistenceManager>();
+            componentApplicationLifetime.RestoreStateAsync(new PrerenderComponentApplicationStore());
+        }
+    }
+
+    private class PrerenderComponentApplicationStore : IPersistentComponentStateStore
+    {
+        public Task<IDictionary<string, byte[]>> GetPersistedStateAsync() => Task.FromResult((IDictionary<string, byte[]>)new Dictionary<string, byte[]>());
+
+        public Task PersistStateAsync(IReadOnlyDictionary<string, byte[]> state) => throw new NotImplementedException();
+    }
+
+    private static string GetFullUri(HttpRequest request)
+    {
+        return UriHelper.BuildAbsolute(
+            request.Scheme,
+            request.Host,
+            request.PathBase,
+            request.Path,
+            request.QueryString);
+    }
+
+    private static string GetContextBaseUri(HttpRequest request)
+    {
+        var result = UriHelper.BuildAbsolute(request.Scheme, request.Host, request.PathBase);
+
+        // PathBase may be "/" or "/some/thing", but to be a well-formed base URI
+        // it has to end with a trailing slash
+        return result.EndsWith('/') ? result : result += "/";
     }
 
     private int RenderElement( HtmlRenderingContext context, ArrayRange<RenderTreeFrame> frames, int position)
@@ -240,14 +346,19 @@ internal sealed class HtmlRenderer : Renderer
 
     private sealed class HtmlRenderingContext
     {
-        public HtmlRenderingContext(IBufferWriter<byte> writer)
+        public HtmlRenderingContext(IBufferWriter<byte> writer, HttpContext httpContext)
         {
             Writer = writer;
+            HttpContext = httpContext;
         }
 
         public IBufferWriter<byte> Writer { get; }
 
+        public HttpContext HttpContext { get; }
+
         public string? ClosestSelectValueAsString { get; set; }
+
+        public bool RequiresClientComponentScripts { get; set; }
     }
 }
 #pragma warning restore BL0006 // Do not use RenderTree types

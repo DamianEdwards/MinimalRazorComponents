@@ -32,8 +32,7 @@ public class ComponentResult<TComponent> : IResult
             ? ParameterView.Empty
             : ParameterView.FromDictionary(_parameters);
 
-        var bufferWriter = httpContext.Response.BodyWriter;
-        await renderer.Dispatcher.InvokeAsync(() => renderer.RenderComponentAsync<TComponent>(parameterView, bufferWriter));
+        await renderer.Dispatcher.InvokeAsync(() => renderer.RenderComponentAsync<TComponent>(parameterView, httpContext));
         await httpContext.Response.BodyWriter.FlushAsync();
     }
 }
