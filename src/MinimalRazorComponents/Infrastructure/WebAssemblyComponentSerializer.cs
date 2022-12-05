@@ -12,6 +12,11 @@ internal sealed class WebAssemblyComponentSerializer
         var typeFullName = type.FullName;
         var (definitions, values) = ComponentParameter.FromParameterView(parameters);
 
+        if (assembly is null || typeFullName is null)
+        {
+            throw new InvalidOperationException();
+        }
+
         // We need to serialize and Base64 encode parameters separately since they can contain arbitrary data that might
         // cause the HTML comment to be invalid (like if you serialize a string that contains two consecutive dashes "--").
         var serializedDefinitions = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(definitions, WebAssemblyComponentSerializationSettings.JsonSerializationOptions));

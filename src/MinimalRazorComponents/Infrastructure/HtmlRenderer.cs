@@ -3,55 +3,51 @@
 
 // This file adapted from https://github.com/dotnet/aspnetcore/blob/792e021af928d435276ffdb2149082ea3d8ce9c5/src/Mvc/Mvc.ViewFeatures/src/RazorComponents/HtmlRenderer.cs
 
+using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
-using System.IO.Pipelines;
-using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.RenderTree;
 
 namespace MinimalRazorComponents.Infrastructure;
 
 #pragma warning disable BL0006 // Do not use RenderTree types
 internal sealed class HtmlRenderer : Renderer
 {
-    private static readonly HashSet<string> SelfClosingElements = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> SelfClosingElements = new(StringComparer.OrdinalIgnoreCase)
     {
         "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"
     };
 
     private static readonly Task CanceledRenderTask = Task.FromCanceled(new CancellationToken(canceled: true));
-    private readonly PipeWriter _writer;
 
-    public HtmlRenderer(IServiceProvider serviceProvider, ILoggerFactory loggerFactory, PipeWriter writer)
+    public HtmlRenderer(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
         : base(serviceProvider, loggerFactory)
     {
-        _writer = writer;
+
     }
 
     public override Dispatcher Dispatcher { get; } = Dispatcher.CreateDefault();
 
     protected override Task UpdateDisplayAsync(in RenderBatch renderBatch) => CanceledRenderTask;
 
-    public async Task RenderComponentAsync(Type componentType, ParameterView initialParameters)
+    public async Task RenderComponentAsync(Type componentType, ParameterView initialParameters, IBufferWriter<byte> bufferWriter)
     {
         var component = InstantiateComponent(componentType);
         var componentId = AssignRootComponentId(component);
 
         await RenderRootComponentAsync(componentId, initialParameters);
 
-        var context = new HtmlRenderingContext(_writer);
+        var context = new HtmlRenderingContext(bufferWriter);
         var frames = GetCurrentRenderTreeFrames(componentId);
-        var newPosition = RenderFrames(context, frames, 0, frames.Count);
+        var _ = RenderFrames(context, frames, 0, frames.Count);
 
-        _writer.AppendHtml(@"<script src=""_framework/blazor.webassembly.js""></script>");
-
-        // When to flush the writer?
-        await _writer.FlushAsync();
+        bufferWriter.AppendHtml(@"<script src=""_framework/blazor.webassembly.js""></script>");
     }
 
-    public Task RenderComponentAsync<TComponent>(ParameterView initialParameters) where TComponent : IComponent
+    public Task RenderComponentAsync<TComponent>(ParameterView initialParameters, IBufferWriter<byte> bufferWriter) where TComponent : IComponent
     {
-        return RenderComponentAsync(typeof(TComponent), initialParameters);
+        return RenderComponentAsync(typeof(TComponent), initialParameters, bufferWriter);
     }
 
     /// <inheritdoc />
@@ -110,8 +106,9 @@ internal sealed class HtmlRenderer : Renderer
 
         if (isClient)
         {
+            // TODO: Support pre-rendering client components
             var marker = WebAssemblyComponentSerializer.SerializeInvocation(component.GetType(), ParameterView.Empty, false);
-            WebAssemblyComponentSerializer.AppendPreamble(_writer, marker);
+            WebAssemblyComponentSerializer.AppendPreamble(context.Writer, marker);
         }
         else
         {
@@ -243,12 +240,12 @@ internal sealed class HtmlRenderer : Renderer
 
     private sealed class HtmlRenderingContext
     {
-        public HtmlRenderingContext(PipeWriter writer)
+        public HtmlRenderingContext(IBufferWriter<byte> writer)
         {
             Writer = writer;
         }
 
-        public PipeWriter Writer { get; }
+        public IBufferWriter<byte> Writer { get; }
 
         public string? ClosestSelectValueAsString { get; set; }
     }

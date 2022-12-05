@@ -18,7 +18,7 @@ public class ComponentResult<TComponent> : IResult
         set => _parameters = value;
     }
 
-    public Task ExecuteAsync(HttpContext httpContext)
+    public async Task ExecuteAsync(HttpContext httpContext)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
 
@@ -26,12 +26,14 @@ public class ComponentResult<TComponent> : IResult
         httpContext.Response.ContentType = "text/html";
 
         var loggerFactory = httpContext.RequestServices.GetRequiredService<ILoggerFactory>();
-        var renderer = new HtmlRenderer(httpContext.RequestServices, loggerFactory, httpContext.Response.BodyWriter);
+        var renderer = new HtmlRenderer(httpContext.RequestServices, loggerFactory);
 
         var parameterView = _parameters is null
             ? ParameterView.Empty
             : ParameterView.FromDictionary(_parameters);
 
-        return renderer.Dispatcher.InvokeAsync(() => renderer.RenderComponentAsync<TComponent>(parameterView));
+        var bufferWriter = httpContext.Response.BodyWriter;
+        await renderer.Dispatcher.InvokeAsync(() => renderer.RenderComponentAsync<TComponent>(parameterView, bufferWriter));
+        await httpContext.Response.BodyWriter.FlushAsync();
     }
 }

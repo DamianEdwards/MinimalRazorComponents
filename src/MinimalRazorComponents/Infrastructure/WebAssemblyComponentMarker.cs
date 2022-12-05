@@ -20,10 +20,10 @@ internal struct WebAssemblyComponentMarker
     public string? PrerenderId { get; set; }
 
     internal static WebAssemblyComponentMarker NonPrerendered(string assembly, string typeName, string parameterDefinitions, string parameterValues) =>
-        new WebAssemblyComponentMarker(ClientMarkerType, assembly, typeName, parameterDefinitions, parameterValues, null);
+        new(ClientMarkerType, assembly, typeName, parameterDefinitions, parameterValues, null);
 
     internal static WebAssemblyComponentMarker Prerendered(string assembly, string typeName, string parameterDefinitions, string parameterValues) =>
-        new WebAssemblyComponentMarker(ClientMarkerType, assembly, typeName, parameterDefinitions, parameterValues, Guid.NewGuid().ToString("N"));
+        new(ClientMarkerType, assembly, typeName, parameterDefinitions, parameterValues, Guid.NewGuid().ToString("N"));
 
     public WebAssemblyEndComponentMarker GetEndRecord()
     {
