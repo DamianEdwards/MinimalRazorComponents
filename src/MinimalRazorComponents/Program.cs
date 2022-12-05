@@ -2,13 +2,10 @@ using MinimalRazorComponents.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddServerSideBlazor();
-
 var app = builder.Build();
 
 app.UseStaticFiles();
 app.UseBlazorFrameworkFiles();
-app.MapBlazorHub();
 
 // Manually rendering components as "fragment" results
 app.MapGet("/", () => Results.Extensions.Component<HelloWorld>(new { Message = "Hello from Minimal APIs" }));
