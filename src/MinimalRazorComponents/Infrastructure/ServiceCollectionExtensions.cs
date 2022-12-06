@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Infrastructure;
+using Microsoft.AspNetCore.Components.Server;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MinimalRazorComponents.Infrastructure;
 
@@ -16,6 +18,7 @@ public static class ServiceCollectionExtensions
     {
         services.TryAddScoped<ComponentStatePersistenceManager>();
         services.TryAddScoped<NavigationManager, HttpNavigationManager>();
+        services.TryAddScoped<AuthenticationStateProvider, ServerAuthenticationStateProvider>();
 
         return services;
     }

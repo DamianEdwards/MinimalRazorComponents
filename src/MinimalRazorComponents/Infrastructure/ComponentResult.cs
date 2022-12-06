@@ -29,7 +29,7 @@ public class ComponentResult<TComponent> : IResult
         var loggerFactory = httpContext.RequestServices.GetRequiredService<ILoggerFactory>();
         var renderer = new HtmlRenderer(httpContext.RequestServices, loggerFactory);
 
-        var parameterView = _parameters is null
+        var initialParameters = _parameters is null
             ? ParameterView.Empty
             : ParameterView.FromDictionary(_parameters);
 
@@ -41,7 +41,7 @@ public class ComponentResult<TComponent> : IResult
         var user = httpContext.User;
 
         var redirectToUrl = await renderer.Dispatcher.InvokeAsync(() =>
-            renderer.RenderComponentAsync<TComponent>(parameterView, bufferWriter, baseUri, currentUri, allowNavigation));
+            renderer.RenderComponentAsync<TComponent>(initialParameters, bufferWriter, baseUri, currentUri, allowNavigation, user));
 
         if (redirectToUrl is not null)
         {

@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.AspNetCore.Components.Server;
 
 namespace MinimalRazorComponents.Infrastructure;
 
@@ -48,6 +49,15 @@ internal sealed class HtmlRenderer : Renderer
         bool allowNavigation,
         ClaimsPrincipal? user = null)
     {
+        if (user is not null)
+        {
+            var authenticationStateProvider = _serviceProvider.GetService<AuthenticationStateProvider>();
+            if (authenticationStateProvider is ServerAuthenticationStateProvider serverAuthenticationStateProvider)
+            {
+                serverAuthenticationStateProvider.SetAuthenticationState(Task.FromResult(new AuthenticationState(user)));
+            }
+        }
+
         var component = InstantiateComponent(componentType);
         var componentId = AssignRootComponentId(component);
 
@@ -199,7 +209,6 @@ internal sealed class HtmlRenderer : Renderer
             var navigationManager = (IHostEnvironmentNavigationManager)serviceProvider.GetRequiredService<NavigationManager>();
             navigationManager.Initialize(GetContextBaseUri(context.BaseUri), context.CurrentUri);
 
-            // TODO: Wire up the user from the request, probably requires registering an AuthenticationStateProvider
             if (context.User is { } user
                 && serviceProvider.GetService<AuthenticationStateProvider>() is IHostEnvironmentAuthenticationStateProvider authenticationStateProvider)
             {
