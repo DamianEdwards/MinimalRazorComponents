@@ -27,7 +27,7 @@ public class ComponentResult<TComponent> : IResult
         httpContext.Response.ContentType = "text/html";
 
         var loggerFactory = httpContext.RequestServices.GetRequiredService<ILoggerFactory>();
-        var renderer = new HtmlRenderer(httpContext.RequestServices, loggerFactory);
+        using var renderer = new HtmlRenderer(httpContext.RequestServices, loggerFactory);
 
         var initialParameters = _parameters is null
             ? ParameterView.Empty

@@ -6,6 +6,14 @@
 
 <p>@counter</p>
 
+@if (!string.IsNullOrEmpty(Message))
+{
+    <p>@Message</p>
+}
+
 @code {
     int counter;
+
+    [Parameter]
+    public string? Message { get; set; }
 }

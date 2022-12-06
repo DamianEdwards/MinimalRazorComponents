@@ -22,7 +22,7 @@ public static class MapComponentExtensions
         // Super hack, using the component itself as the object that RequestDelegateFactory binds to & then passing it to the renderer as the object
         // to get parameters from.
         endpointRouteBuilder.Map(mapRoutePattern, ([AsParameters]T component) => Results.Extensions.Component<T>(component))
-            .WithName(GetEndpointName<T>());
+            .WithName(ComponentName<T>.Name);
 
         return endpointRouteBuilder;
     }
@@ -57,9 +57,12 @@ public static class MapComponentExtensions
 
     public static string? GetPathByComponent<T>(this LinkGenerator linkGenerator, object? values = null)
     {
-        var name = GetEndpointName<T>();
+        var name = ComponentName<T>.Name;
         return linkGenerator.GetPathByName(name, values);
     }
 
-    private static string GetEndpointName<TComponent>() => "ComponentPageRoute__" + typeof(TComponent).Name;
+    private static class ComponentName<T>
+    {
+        public static string Name = "ComponentPageRoute__" + typeof(T).Name;
+    }
 }

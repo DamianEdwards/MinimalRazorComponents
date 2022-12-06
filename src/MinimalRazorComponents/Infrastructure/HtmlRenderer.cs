@@ -152,6 +152,7 @@ internal sealed class HtmlRenderer : Renderer
         var component = frame.Component;
         var componentType = component.GetType();
 
+        // TODO: How to get the parameters from the parent component here?
         var marker = WebAssemblyComponentSerializer.SerializeInvocation(componentType, ParameterView.Empty, prerendered: true);
         WebAssemblyComponentSerializer.AppendPreamble(context.Writer, marker);
 

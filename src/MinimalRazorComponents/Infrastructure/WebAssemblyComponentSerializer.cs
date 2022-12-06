@@ -6,6 +6,10 @@ namespace MinimalRazorComponents.Infrastructure;
 
 internal sealed class WebAssemblyComponentSerializer
 {
+    private static readonly (IList<ComponentParameter> parameterDefinitions, IList<object?> parameterValues) EmptyParameterDetails = ComponentParameter.FromParameterView(ParameterView.Empty);
+    private static readonly string EmptyDefinitions = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(EmptyParameterDetails.parameterDefinitions, WebAssemblyComponentSerializationSettings.JsonSerializationOptions));
+    private static readonly string EmptyValues = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(EmptyParameterDetails.parameterValues, WebAssemblyComponentSerializationSettings.JsonSerializationOptions));
+
     public static WebAssemblyComponentMarker SerializeInvocation(Type type, ParameterView parameters, bool prerendered)
     {
         var assembly = type.Assembly.GetName().Name;
@@ -15,6 +19,15 @@ internal sealed class WebAssemblyComponentSerializer
         if (assembly is null || typeFullName is null)
         {
             throw new InvalidOperationException();
+        }
+
+        if (!parameters.GetEnumerator().MoveNext())
+        {
+            // No parameters so use the cache empty values serialization
+
+            return prerendered
+                ? WebAssemblyComponentMarker.Prerendered(assembly, typeFullName, EmptyDefinitions, EmptyValues)
+                : WebAssemblyComponentMarker.NonPrerendered(assembly, typeFullName, EmptyDefinitions, EmptyValues);
         }
 
         // We need to serialize and Base64 encode parameters separately since they can contain arbitrary data that might
