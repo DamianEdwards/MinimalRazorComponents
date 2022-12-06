@@ -199,7 +199,7 @@ internal sealed class HtmlRenderer : Renderer
             var navigationManager = (IHostEnvironmentNavigationManager)serviceProvider.GetRequiredService<NavigationManager>();
             navigationManager.Initialize(GetContextBaseUri(context.BaseUri), context.CurrentUri);
 
-            // TODO: Wire up the user from the request
+            // TODO: Wire up the user from the request, probably requires registering an AuthenticationStateProvider
             if (context.User is { } user
                 && serviceProvider.GetService<AuthenticationStateProvider>() is IHostEnvironmentAuthenticationStateProvider authenticationStateProvider)
             {
