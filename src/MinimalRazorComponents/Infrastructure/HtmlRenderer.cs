@@ -62,7 +62,7 @@ internal sealed class HtmlRenderer : Renderer
 
         if (context.RequiresClientComponentScripts)
         {
-            bufferWriter.AppendHtml(@"<script src=""_framework/blazor.webassembly.js""></script>");
+            bufferWriter.WriteHtml(@"<script src=""_framework/blazor.webassembly.js""></script>");
         }
 
         return context.RedirectToUrl;
@@ -110,10 +110,10 @@ internal sealed class HtmlRenderer : Renderer
             case RenderTreeFrameType.Attribute:
                 throw new InvalidOperationException($"Attributes should only be encountered within {nameof(RenderElement)}");
             case RenderTreeFrameType.Text:
-                context.Writer.Append(frame.TextContent);
+                context.Writer.Write(frame.TextContent);
                 return ++position;
             case RenderTreeFrameType.Markup:
-                context.Writer.AppendHtml(frame.MarkupContent);
+                context.Writer.WriteHtml(frame.MarkupContent);
                 return ++position;
             case RenderTreeFrameType.Component:
                 return RenderChildComponent(context, frames, position);
@@ -233,8 +233,8 @@ internal sealed class HtmlRenderer : Renderer
     {
         ref var frame = ref frames.Array[position];
         var writer = context.Writer;
-        writer.AppendHtml("<");
-        writer.AppendHtml(frame.ElementName);
+        writer.WriteHtml("<");
+        writer.WriteHtml(frame.ElementName);
         var afterAttributes = RenderAttributes(context, frames, position + 1, frame.ElementSubtreeLength - 1, out var capturedValueAttribute);
 
         // When we see an <option> as a descendant of a <select>, and the option's "value" attribute matches the
@@ -244,13 +244,13 @@ internal sealed class HtmlRenderer : Renderer
             && string.Equals(frame.ElementName, "option", StringComparison.OrdinalIgnoreCase)
             && string.Equals(capturedValueAttribute, context.ClosestSelectValueAsString, StringComparison.Ordinal))
         {
-            writer.AppendHtml(" selected");
+            writer.WriteHtml(" selected");
         }
 
         var remainingElements = frame.ElementSubtreeLength + position - afterAttributes;
         if (remainingElements > 0)
         {
-            writer.AppendHtml(">");
+            writer.WriteHtml(">");
 
             var isSelect = string.Equals(frame.ElementName, "select", StringComparison.OrdinalIgnoreCase);
             if (isSelect)
@@ -267,9 +267,9 @@ internal sealed class HtmlRenderer : Renderer
                 context.ClosestSelectValueAsString = null;
             }
 
-            writer.AppendHtml("</");
-            writer.AppendHtml(frame.ElementName);
-            writer.AppendHtml(">");
+            writer.WriteHtml("</");
+            writer.WriteHtml(frame.ElementName);
+            writer.WriteHtml(">");
             Debug.Assert(afterElement == position + frame.ElementSubtreeLength);
             return afterElement;
         }
@@ -277,14 +277,14 @@ internal sealed class HtmlRenderer : Renderer
         {
             if (SelfClosingElements.Contains(frame.ElementName))
             {
-                writer.AppendHtml(" />");
+                writer.WriteHtml(" />");
             }
             else
             {
-                writer.AppendHtml(">");
-                writer.AppendHtml("</");
-                writer.AppendHtml(frame.ElementName);
-                writer.AppendHtml(">");
+                writer.WriteHtml(">");
+                writer.WriteHtml("</");
+                writer.WriteHtml(frame.ElementName);
+                writer.WriteHtml(">");
             }
             Debug.Assert(afterAttributes == position + frame.ElementSubtreeLength);
             return afterAttributes;
@@ -330,16 +330,16 @@ internal sealed class HtmlRenderer : Renderer
             switch (frame.AttributeValue)
             {
                 case bool flag when flag:
-                    result.AppendHtml(" ");
-                    result.AppendHtml(frame.AttributeName);
+                    result.WriteHtml(" ");
+                    result.WriteHtml(frame.AttributeName);
                     break;
                 case string value:
-                    result.AppendHtml(" ");
-                    result.AppendHtml(frame.AttributeName);
-                    result.AppendHtml("=");
-                    result.AppendHtml("\"");
-                    result.Append(value);
-                    result.AppendHtml("\"");
+                    result.WriteHtml(" ");
+                    result.WriteHtml(frame.AttributeName);
+                    result.WriteHtml("=");
+                    result.WriteHtml("\"");
+                    result.Write(value);
+                    result.WriteHtml("\"");
                     break;
                 default:
                     break;

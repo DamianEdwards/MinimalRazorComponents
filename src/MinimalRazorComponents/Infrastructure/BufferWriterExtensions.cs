@@ -8,7 +8,7 @@ namespace MinimalRazorComponents.Infrastructure;
 
 public static class BufferWriterExtensions
 {
-    public static void Append(this IBufferWriter<byte> bufferWriter, string text)
+    public static void Write(this IBufferWriter<byte> bufferWriter, string text)
     {
         if (!string.IsNullOrEmpty(text))
         {
@@ -30,7 +30,7 @@ public static class BufferWriterExtensions
         }
     }
 
-    public static void AppendHtml(this IBufferWriter<byte> bufferWriter, string? encoded)
+    public static void WriteHtml(this IBufferWriter<byte> bufferWriter, string? encoded)
     {
         if (!string.IsNullOrEmpty(encoded))
         {

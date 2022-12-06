@@ -32,9 +32,9 @@ internal sealed class WebAssemblyComponentSerializer
             record,
             WebAssemblyComponentSerializationSettings.JsonSerializationOptions);
 
-        bufferWriter.AppendHtml("<!--Blazor:");
-        bufferWriter.AppendHtml(serializedStartRecord);
-        bufferWriter.AppendHtml("-->");
+        bufferWriter.WriteHtml("<!--Blazor:");
+        bufferWriter.WriteHtml(serializedStartRecord);
+        bufferWriter.WriteHtml("-->");
     }
 
     internal static void AppendEpilogue(IBufferWriter<byte> bufferWriter, WebAssemblyComponentMarker record)
@@ -43,8 +43,8 @@ internal sealed class WebAssemblyComponentSerializer
             record.GetEndRecord(),
             WebAssemblyComponentSerializationSettings.JsonSerializationOptions);
 
-        bufferWriter.AppendHtml("<!--Blazor:");
-        bufferWriter.AppendHtml(endRecord);
-        bufferWriter.AppendHtml("-->");
+        bufferWriter.WriteHtml("<!--Blazor:");
+        bufferWriter.WriteHtml(endRecord);
+        bufferWriter.WriteHtml("-->");
     }
 }
