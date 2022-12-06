@@ -24,7 +24,6 @@ public static class BufferWriterExtensions
             }
 
             // Copy to pipe
-            // TODO: Verify the offset math here is correct, I have a feeling it's not for non-8-bit chars, etc.
             var bytesWritten = Encoding.UTF8.GetBytes(encodedCharsSpan.AsSpan()[..charsWritten], bufferWriter);
 
             ArrayPool<char>.Shared.Return(encodedCharsSpan);
