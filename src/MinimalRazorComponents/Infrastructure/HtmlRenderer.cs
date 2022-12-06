@@ -171,7 +171,6 @@ internal sealed class HtmlRenderer : Renderer
         catch (NavigationException navigationException)
         {
             // Navigation was attempted during prerendering.
-            //if (context.HttpContext.Response.HasStarted)
             if (context.AllowNavigation)
             {
                 // We can't perform a redirect as the server already started sending the response.
@@ -182,7 +181,6 @@ internal sealed class HtmlRenderer : Renderer
                     "response and avoid using features like FlushAsync() before all components on the page have been rendered to prevent failed navigation commands.", navigationException);
             }
 
-            //context.HttpContext.Response.Redirect(navigationException.Location);
             context.RedirectToUrl = navigationException.Location;
         }
 
