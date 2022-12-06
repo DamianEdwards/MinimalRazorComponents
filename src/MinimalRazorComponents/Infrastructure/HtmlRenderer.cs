@@ -132,7 +132,6 @@ internal sealed class HtmlRenderer : Renderer
         var marker = WebAssemblyComponentSerializer.SerializeInvocation(componentType, ParameterView.Empty, prerendered: true);
         WebAssemblyComponentSerializer.AppendPreamble(context.Writer, marker);
 
-        // This is sync
         InitializeStandardComponentServices(context.HttpContext);
 
         try
@@ -180,10 +179,9 @@ internal sealed class HtmlRenderer : Renderer
         static void InitializeCore(HttpContext httpContext)
         {
             var navigationManager = (IHostEnvironmentNavigationManager)httpContext.RequestServices.GetRequiredService<NavigationManager>();
-            navigationManager?.Initialize(GetContextBaseUri(httpContext.Request), GetFullUri(httpContext.Request));
+            navigationManager.Initialize(GetContextBaseUri(httpContext.Request), GetFullUri(httpContext.Request));
 
-            var authenticationStateProvider = httpContext.RequestServices.GetService<AuthenticationStateProvider>() as IHostEnvironmentAuthenticationStateProvider;
-            if (authenticationStateProvider != null)
+            if (httpContext.RequestServices.GetService<AuthenticationStateProvider>() is IHostEnvironmentAuthenticationStateProvider authenticationStateProvider)
             {
                 var authenticationState = new AuthenticationState(httpContext.User);
                 authenticationStateProvider.SetAuthenticationState(Task.FromResult(authenticationState));
@@ -193,7 +191,7 @@ internal sealed class HtmlRenderer : Renderer
             // (which will obviously not work, but should not fail)
             var componentApplicationLifetime = httpContext.RequestServices.GetRequiredService<ComponentStatePersistenceManager>();
             
-            // This is actually sync in the default implementation
+            // This is actually sync as it delegates to calling the store being
             componentApplicationLifetime.RestoreStateAsync(new PrerenderComponentApplicationStore()).GetAwaiter().GetResult();
         }
     }
