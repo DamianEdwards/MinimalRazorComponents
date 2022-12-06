@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.AspNetCore.Components.Routing;
-using Microsoft.AspNetCore.Components.Server;
 
 namespace MinimalRazorComponents.Infrastructure;
 
@@ -49,21 +48,15 @@ internal sealed class HtmlRenderer : Renderer
         bool allowNavigation,
         ClaimsPrincipal? user = null)
     {
-        if (user is not null)
-        {
-            var authenticationStateProvider = _serviceProvider.GetService<AuthenticationStateProvider>();
-            if (authenticationStateProvider is ServerAuthenticationStateProvider serverAuthenticationStateProvider)
-            {
-                serverAuthenticationStateProvider.SetAuthenticationState(Task.FromResult(new AuthenticationState(user)));
-            }
-        }
-
         var component = InstantiateComponent(componentType);
         var componentId = AssignRootComponentId(component);
 
+        var context = new HtmlRenderingContext(bufferWriter, baseUri, currentUri, allowNavigation, user);
+
+        InitializeStandardComponentServices(context);
+
         await RenderRootComponentAsync(componentId, initialParameters);
 
-        var context = new HtmlRenderingContext(bufferWriter, baseUri, currentUri, allowNavigation, user);
         var frames = GetCurrentRenderTreeFrames(componentId);
         var _ = RenderFrames(context, frames, 0, frames.Count);
 
@@ -139,7 +132,8 @@ internal sealed class HtmlRenderer : Renderer
         ref var frame = ref frames.Array[position];
         var component = frame.Component;
 
-        var isClient = component.GetType().GetCustomAttributes(false).Any(a => a.GetType().Name.Equals("ClientComponentAttribute", StringComparison.Ordinal));
+        var isClient = component.GetType().GetCustomAttributes(false)
+            .Any(a => string.Equals(a.GetType().Name, "ClientComponentAttribute", StringComparison.Ordinal));
 
         if (isClient)
         {
@@ -160,8 +154,6 @@ internal sealed class HtmlRenderer : Renderer
 
         var marker = WebAssemblyComponentSerializer.SerializeInvocation(componentType, ParameterView.Empty, prerendered: true);
         WebAssemblyComponentSerializer.AppendPreamble(context.Writer, marker);
-
-        InitializeStandardComponentServices(context);
 
         try
         {
@@ -359,11 +351,11 @@ internal sealed class HtmlRenderer : Renderer
 
     private sealed class HtmlRenderingContext
     {
-        public HtmlRenderingContext(IBufferWriter<byte> writer, string baseUri, string uri, bool allowNavigation, ClaimsPrincipal? user = null)
+        public HtmlRenderingContext(IBufferWriter<byte> writer, string baseUri, string currentUri, bool allowNavigation, ClaimsPrincipal? user = null)
         {
             Writer = writer;
             BaseUri = baseUri;
-            CurrentUri = uri;
+            CurrentUri = currentUri;
             AllowNavigation = allowNavigation;
             User = user;
         }
