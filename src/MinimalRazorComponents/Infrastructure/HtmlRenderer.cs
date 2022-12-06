@@ -6,12 +6,12 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.AspNetCore.Components.Routing;
-using Microsoft.AspNetCore.Http.Extensions;
 
 namespace MinimalRazorComponents.Infrastructure;
 
@@ -25,37 +25,56 @@ internal sealed class HtmlRenderer : Renderer
 
     private static readonly Task CanceledRenderTask = Task.FromCanceled(new CancellationToken(canceled: true));
 
+    private bool _initialized;
+    private readonly object _lock = new();
+    private readonly IServiceProvider _serviceProvider;
+
     public HtmlRenderer(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
         : base(serviceProvider, loggerFactory)
     {
-
+        _serviceProvider = serviceProvider;
     }
 
     public override Dispatcher Dispatcher { get; } = Dispatcher.CreateDefault();
 
     protected override Task UpdateDisplayAsync(in RenderBatch renderBatch) => CanceledRenderTask;
 
-    public async Task RenderComponentAsync(Type componentType, ParameterView initialParameters, HttpContext httpContext)
+    public async Task<string?> RenderComponentAsync(
+        Type componentType,
+        ParameterView initialParameters,
+        IBufferWriter<byte> bufferWriter,
+        string baseUri,
+        string currentUri,
+        bool allowNavigation,
+        ClaimsPrincipal? user = null)
     {
         var component = InstantiateComponent(componentType);
         var componentId = AssignRootComponentId(component);
 
         await RenderRootComponentAsync(componentId, initialParameters);
 
-        var context = new HtmlRenderingContext(httpContext.Response.BodyWriter, httpContext);
+        var context = new HtmlRenderingContext(bufferWriter, baseUri, currentUri, allowNavigation, user);
         var frames = GetCurrentRenderTreeFrames(componentId);
         var _ = RenderFrames(context, frames, 0, frames.Count);
 
         if (context.RequiresClientComponentScripts)
         {
-            httpContext.Response.BodyWriter.AppendHtml(@"<script src=""_framework/blazor.webassembly.js""></script>");
+            bufferWriter.AppendHtml(@"<script src=""_framework/blazor.webassembly.js""></script>");
         }
+
+        return context.RedirectToUrl;
     }
 
-    public Task RenderComponentAsync<TComponent>(ParameterView initialParameters, HttpContext httpContext)
+    public Task<string?> RenderComponentAsync<TComponent>(
+        ParameterView initialParameters,
+        IBufferWriter<byte> bufferWriter,
+        string baseUri,
+        string currentUri,
+        bool allowNavigation,
+        ClaimsPrincipal? user = null)
         where TComponent : IComponent
     {
-        return RenderComponentAsync(typeof(TComponent), initialParameters, httpContext);
+        return RenderComponentAsync(typeof(TComponent), initialParameters, bufferWriter, baseUri, currentUri, allowNavigation, user);
     }
 
     /// <inheritdoc />
@@ -109,7 +128,7 @@ internal sealed class HtmlRenderer : Renderer
     {
         ref var frame = ref frames.Array[position];
         var component = frame.Component;
-        
+
         var isClient = component.GetType().GetCustomAttributes(false).Any(a => a.GetType().Name.Equals("ClientComponentAttribute", StringComparison.Ordinal));
 
         if (isClient)
@@ -132,7 +151,7 @@ internal sealed class HtmlRenderer : Renderer
         var marker = WebAssemblyComponentSerializer.SerializeInvocation(componentType, ParameterView.Empty, prerendered: true);
         WebAssemblyComponentSerializer.AppendPreamble(context.Writer, marker);
 
-        InitializeStandardComponentServices(context.HttpContext);
+        InitializeStandardComponentServices(context);
 
         try
         {
@@ -142,7 +161,8 @@ internal sealed class HtmlRenderer : Renderer
         catch (NavigationException navigationException)
         {
             // Navigation was attempted during prerendering.
-            if (context.HttpContext.Response.HasStarted)
+            //if (context.HttpContext.Response.HasStarted)
+            if (context.AllowNavigation)
             {
                 // We can't perform a redirect as the server already started sending the response.
                 // This is considered an application error as the developer should buffer the response until
@@ -152,7 +172,8 @@ internal sealed class HtmlRenderer : Renderer
                     "response and avoid using features like FlushAsync() before all components on the page have been rendered to prevent failed navigation commands.", navigationException);
             }
 
-            context.HttpContext.Response.Redirect(navigationException.Location);
+            //context.HttpContext.Response.Redirect(navigationException.Location);
+            context.RedirectToUrl = navigationException.Location;
         }
 
         WebAssemblyComponentSerializer.AppendEpilogue(context.Writer, marker);
@@ -160,10 +181,7 @@ internal sealed class HtmlRenderer : Renderer
         context.RequiresClientComponentScripts = true;
     }
 
-    private bool _initialized;
-    private readonly object _lock = new();
-
-    private void InitializeStandardComponentServices(HttpContext httpContext)
+    private void InitializeStandardComponentServices(HtmlRenderingContext htmlRenderingContext)
     {
         // This might not be the first component in the request we are rendering, so
         // we need to check if we already initialized the services in this request.
@@ -171,25 +189,27 @@ internal sealed class HtmlRenderer : Renderer
         {
             if (!_initialized)
             {
-                InitializeCore(httpContext);
+                InitializeCore(_serviceProvider, htmlRenderingContext);
                 _initialized = true;
             }
         }
 
-        static void InitializeCore(HttpContext httpContext)
+        static void InitializeCore(IServiceProvider serviceProvider, HtmlRenderingContext context)
         {
-            var navigationManager = (IHostEnvironmentNavigationManager)httpContext.RequestServices.GetRequiredService<NavigationManager>();
-            navigationManager.Initialize(GetContextBaseUri(httpContext.Request), GetFullUri(httpContext.Request));
+            var navigationManager = (IHostEnvironmentNavigationManager)serviceProvider.GetRequiredService<NavigationManager>();
+            navigationManager.Initialize(GetContextBaseUri(context.BaseUri), context.CurrentUri);
 
-            if (httpContext.RequestServices.GetService<AuthenticationStateProvider>() is IHostEnvironmentAuthenticationStateProvider authenticationStateProvider)
+            // TODO: Wire up the user from the request
+            if (context.User is { } user
+                && serviceProvider.GetService<AuthenticationStateProvider>() is IHostEnvironmentAuthenticationStateProvider authenticationStateProvider)
             {
-                var authenticationState = new AuthenticationState(httpContext.User);
+                var authenticationState = new AuthenticationState(user);
                 authenticationStateProvider.SetAuthenticationState(Task.FromResult(authenticationState));
             }
 
             // It's important that this is initialized since a component might try to restore state during prerendering
             // (which will obviously not work, but should not fail)
-            var componentApplicationLifetime = httpContext.RequestServices.GetRequiredService<ComponentStatePersistenceManager>();
+            var componentApplicationLifetime = serviceProvider.GetRequiredService<ComponentStatePersistenceManager>();
             
             // This is actually sync as it delegates to calling the store being
             componentApplicationLifetime.RestoreStateAsync(new PrerenderComponentApplicationStore()).GetAwaiter().GetResult();
@@ -203,23 +223,11 @@ internal sealed class HtmlRenderer : Renderer
         public Task PersistStateAsync(IReadOnlyDictionary<string, byte[]> state) => throw new NotImplementedException();
     }
 
-    private static string GetFullUri(HttpRequest request)
+    private static string GetContextBaseUri(string uri)
     {
-        return UriHelper.BuildAbsolute(
-            request.Scheme,
-            request.Host,
-            request.PathBase,
-            request.Path,
-            request.QueryString);
-    }
-
-    private static string GetContextBaseUri(HttpRequest request)
-    {
-        var result = UriHelper.BuildAbsolute(request.Scheme, request.Host, request.PathBase);
-
         // PathBase may be "/" or "/some/thing", but to be a well-formed base URI
         // it has to end with a trailing slash
-        return result.EndsWith('/') ? result : result += "/";
+        return uri.EndsWith('/') ? uri : uri += "/";
     }
 
     private int RenderElement( HtmlRenderingContext context, ArrayRange<RenderTreeFrame> frames, int position)
@@ -344,19 +352,30 @@ internal sealed class HtmlRenderer : Renderer
 
     private sealed class HtmlRenderingContext
     {
-        public HtmlRenderingContext(IBufferWriter<byte> writer, HttpContext httpContext)
+        public HtmlRenderingContext(IBufferWriter<byte> writer, string baseUri, string uri, bool allowNavigation, ClaimsPrincipal? user = null)
         {
             Writer = writer;
-            HttpContext = httpContext;
+            BaseUri = baseUri;
+            CurrentUri = uri;
+            AllowNavigation = allowNavigation;
+            User = user;
         }
 
         public IBufferWriter<byte> Writer { get; }
 
-        public HttpContext HttpContext { get; }
+        public string BaseUri { get; }
+
+        public string CurrentUri { get; }
+
+        public ClaimsPrincipal? User { get; }
+
+        public bool AllowNavigation { get; }
 
         public string? ClosestSelectValueAsString { get; set; }
 
         public bool RequiresClientComponentScripts { get; set; }
+
+        public string? RedirectToUrl { get; set; }
     }
 }
 #pragma warning restore BL0006 // Do not use RenderTree types

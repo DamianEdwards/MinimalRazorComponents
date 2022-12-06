@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Http.Extensions;
 using MinimalRazorComponents.Infrastructure;
 
 namespace Microsoft.AspNetCore.Http.HttpResults;
@@ -32,7 +33,23 @@ public class ComponentResult<TComponent> : IResult
             ? ParameterView.Empty
             : ParameterView.FromDictionary(_parameters);
 
-        await renderer.Dispatcher.InvokeAsync(() => renderer.RenderComponentAsync<TComponent>(parameterView, httpContext));
-        await httpContext.Response.BodyWriter.FlushAsync();
+        var bufferWriter = httpContext.Response.BodyWriter;
+        var request = httpContext.Request;
+        var baseUri = UriHelper.BuildAbsolute(request.Scheme, request.Host, request.PathBase);
+        var currentUri = UriHelper.BuildAbsolute(request.Scheme, request.Host, request.PathBase, request.Path, request.QueryString);
+        var allowNavigation = !httpContext.Response.HasStarted;
+        var user = httpContext.User;
+
+        var redirectToUrl = await renderer.Dispatcher.InvokeAsync(() =>
+            renderer.RenderComponentAsync<TComponent>(parameterView, bufferWriter, baseUri, currentUri, allowNavigation));
+
+        if (redirectToUrl is not null)
+        {
+            httpContext.Response.Redirect(redirectToUrl);
+        }
+        else
+        {
+            await httpContext.Response.BodyWriter.FlushAsync();
+        }
     }
 }
