@@ -26,7 +26,7 @@ public class ComponentResult<TComponent> : IResult
         ArgumentNullException.ThrowIfNull(httpContext);
 
         httpContext.Response.StatusCode = 200;
-        httpContext.Response.ContentType = "text/html";
+        httpContext.Response.ContentType = "text/html; charset=UTF-8";
 
         var loggerFactory = httpContext.RequestServices.GetRequiredService<ILoggerFactory>();
         var navigationManager = httpContext.RequestServices.GetRequiredService<NavigationManager>();
@@ -42,7 +42,6 @@ public class ComponentResult<TComponent> : IResult
             : ParameterView.FromDictionary(_parameters);
 
         var bufferWriter = httpContext.Response.BodyWriter;
-        var request = httpContext.Request;
         var allowNavigation = !httpContext.Response.HasStarted;
         var user = httpContext.User;
 
