@@ -1,5 +1,4 @@
 ﻿using System.Buffers;
-using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
 
@@ -12,20 +11,46 @@ public static class BufferWriterExtensions
         if (!string.IsNullOrEmpty(text))
         {
             var textSpan = text.AsSpan();
-            
-            // How much space do we need to HTML encoding?
-            var encodedCharsSpan = ArrayPool<char>.Shared.Rent(textSpan.Length * 4);
-            var status = HtmlEncoder.Default.Encode(textSpan, (Span<char>)encodedCharsSpan, out int _, out int charsWritten);
-            
-            if (status != OperationStatus.Done || charsWritten != text.Length)
+            var encodeStatus = OperationStatus.Done;
+
+            char[]? rentedBuffer = null;
+            var encodedBuffer = Array.Empty<char>();
+
+            while (textSpan.Length > 0)
             {
-                throw new NotImplementedException();
+                if (encodedBuffer.Length == 0)
+                {
+                    if (rentedBuffer is not null)
+                    {
+                        ArrayPool<char>.Shared.Return(rentedBuffer);
+                    }
+
+                    // TODO: What size should this be?
+                    var rentedSpanSize = Math.Min(1024, textSpan.Length * 2);
+                    rentedBuffer = ArrayPool<char>.Shared.Rent(rentedSpanSize);
+                    encodedBuffer = rentedBuffer;
+                }
+
+                // Encode to rented buffer
+                encodeStatus = HtmlEncoder.Default.Encode(textSpan, (Span<char>)encodedBuffer, out int charsConsumed, out int charsWritten);
+
+                // Write encoded chars to the writer
+                var encoded = encodedBuffer.AsSpan()[..charsWritten];
+                WriteHtml(bufferWriter, encoded);
+
+                textSpan = textSpan[charsConsumed..];
+                encodedBuffer = encodedBuffer[charsWritten..];
             }
 
-            // Copy to pipe
-            var _ = Encoding.UTF8.GetBytes(encodedCharsSpan.AsSpan()[..charsWritten], bufferWriter);
+            if (rentedBuffer is not null)
+            {
+                ArrayPool<char>.Shared.Return(rentedBuffer);
+            }
 
-            ArrayPool<char>.Shared.Return(encodedCharsSpan);
+            if (encodeStatus != OperationStatus.Done)
+            {
+                throw new InvalidOperationException("Bad math");
+            }
         }
     }
 
@@ -34,16 +59,32 @@ public static class BufferWriterExtensions
         if (!string.IsNullOrEmpty(encoded))
         {
             var textSpan = encoded.AsSpan();
-            var writerSpan = bufferWriter.GetSpan(textSpan.Length);
+            WriteHtml(bufferWriter, textSpan);
+        }
+    }
 
-            var status = Utf8.FromUtf16(textSpan, writerSpan, out var _, out var bytesWritten);
+    private static void WriteHtml(IBufferWriter<byte> bufferWriter, ReadOnlySpan<char> encoded)
+    {
+        var writerSpan = bufferWriter.GetSpan();
+        var status = OperationStatus.Done;
 
-            bufferWriter.Advance(bytesWritten);
-
-            if (status != OperationStatus.Done)
+        while (encoded.Length > 0)
+        {
+            if (writerSpan.Length == 0)
             {
-                throw new NotImplementedException();
+                writerSpan = bufferWriter.GetSpan();
             }
+
+            status = Utf8.FromUtf16(encoded, writerSpan, out var charsWritten, out var bytesWritten);
+
+            encoded = encoded[charsWritten..];
+            writerSpan = writerSpan[bytesWritten..];
+            bufferWriter.Advance(bytesWritten);
+        }
+
+        if (status != OperationStatus.Done)
+        {
+            throw new InvalidOperationException("Bad math");
         }
     }
 }

@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.RenderTree;
-using Microsoft.AspNetCore.Components.Routing;
 
 namespace MinimalRazorComponents.Infrastructure;
 
@@ -43,15 +42,13 @@ internal sealed class HtmlRenderer : Renderer
         Type componentType,
         ParameterView initialParameters,
         IBufferWriter<byte> bufferWriter,
-        string baseUri,
-        string currentUri,
         bool allowNavigation,
         ClaimsPrincipal? user = null)
     {
         var component = InstantiateComponent(componentType);
         var componentId = AssignRootComponentId(component);
 
-        var context = new HtmlRenderingContext(bufferWriter, baseUri, currentUri, allowNavigation, user);
+        var context = new HtmlRenderingContext(bufferWriter, allowNavigation, user);
 
         InitializeStandardComponentServices(context);
 
@@ -71,13 +68,11 @@ internal sealed class HtmlRenderer : Renderer
     public Task<string?> RenderComponentAsync<TComponent>(
         ParameterView initialParameters,
         IBufferWriter<byte> bufferWriter,
-        string baseUri,
-        string currentUri,
         bool allowNavigation,
         ClaimsPrincipal? user = null)
         where TComponent : IComponent
     {
-        return RenderComponentAsync(typeof(TComponent), initialParameters, bufferWriter, baseUri, currentUri, allowNavigation, user);
+        return RenderComponentAsync(typeof(TComponent), initialParameters, bufferWriter, allowNavigation, user);
     }
 
     /// <inheritdoc />
@@ -197,9 +192,6 @@ internal sealed class HtmlRenderer : Renderer
 
         static void InitializeCore(IServiceProvider serviceProvider, HtmlRenderingContext context)
         {
-            var navigationManager = (IHostEnvironmentNavigationManager)serviceProvider.GetRequiredService<NavigationManager>();
-            navigationManager.Initialize(GetContextBaseUri(context.BaseUri), context.CurrentUri);
-
             if (context.User is { } user
                 && serviceProvider.GetService<AuthenticationStateProvider>() is IHostEnvironmentAuthenticationStateProvider authenticationStateProvider)
             {
@@ -211,7 +203,7 @@ internal sealed class HtmlRenderer : Renderer
             // (which will obviously not work, but should not fail)
             var componentApplicationLifetime = serviceProvider.GetRequiredService<ComponentStatePersistenceManager>();
             
-            // This is actually sync as it delegates to calling the store being
+            // This is actually sync as it delegates to calling the store passed in which is the implementation below
             componentApplicationLifetime.RestoreStateAsync(new PrerenderComponentApplicationStore()).GetAwaiter().GetResult();
         }
     }
@@ -223,14 +215,7 @@ internal sealed class HtmlRenderer : Renderer
         public Task PersistStateAsync(IReadOnlyDictionary<string, byte[]> state) => throw new NotImplementedException();
     }
 
-    private static string GetContextBaseUri(string uri)
-    {
-        // PathBase may be "/" or "/some/thing", but to be a well-formed base URI
-        // it has to end with a trailing slash
-        return uri.EndsWith('/') ? uri : uri += "/";
-    }
-
-    private int RenderElement( HtmlRenderingContext context, ArrayRange<RenderTreeFrame> frames, int position)
+    private int RenderElement(HtmlRenderingContext context, ArrayRange<RenderTreeFrame> frames, int position)
     {
         ref var frame = ref frames.Array[position];
         var writer = context.Writer;
@@ -352,20 +337,17 @@ internal sealed class HtmlRenderer : Renderer
 
     private sealed class HtmlRenderingContext
     {
-        public HtmlRenderingContext(IBufferWriter<byte> writer, string baseUri, string currentUri, bool allowNavigation, ClaimsPrincipal? user = null)
+        public HtmlRenderingContext(
+            IBufferWriter<byte> writer,
+            bool allowNavigation,
+            ClaimsPrincipal? user = null)
         {
             Writer = writer;
-            BaseUri = baseUri;
-            CurrentUri = currentUri;
             AllowNavigation = allowNavigation;
             User = user;
         }
 
         public IBufferWriter<byte> Writer { get; }
-
-        public string BaseUri { get; }
-
-        public string CurrentUri { get; }
 
         public ClaimsPrincipal? User { get; }
 

@@ -4,7 +4,7 @@
 @using Microsoft.AspNetCore.Mvc;
 
 <LayoutView Layout="typeof(Layout)">
-    <h1>Form Handling</h1>
+    <h1 class="mt-2">Form Handling</h1>
 
     <p>Fill out this form</p>
 
@@ -52,5 +52,4 @@
     {
         message = !string.IsNullOrEmpty(Email) ? $"Email = {Email}" : "No values";
     }
-
 }
