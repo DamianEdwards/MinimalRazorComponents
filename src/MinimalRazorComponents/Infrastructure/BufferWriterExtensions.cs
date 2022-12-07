@@ -8,62 +8,63 @@ public static class BufferWriterExtensions
 {
     public static void Write(this IBufferWriter<byte> bufferWriter, string text)
     {
-        if (!string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(text))
         {
-            ReadOnlySpan<char> textSpan = text;
-            var encodeStatus = OperationStatus.Done;
+            return;
+        }
 
-            if (textSpan.Length <= 256)
+        ReadOnlySpan<char> textSpan = text;
+        var encodeStatus = OperationStatus.Done;
+
+        if (textSpan.Length <= 128)
+        {
+            WriteSmall(bufferWriter, textSpan);
+            return;
+        }
+
+        char[]? rentedBuffer = null;
+        Span<char> encodedBuffer = Array.Empty<char>();
+
+        while (textSpan.Length > 0)
+        {
+            if (encodedBuffer.Length == 0)
             {
-                WriteSmall(bufferWriter, textSpan);
-                return;
-            }
-
-            char[]? rentedBuffer = null;
-            Span<char> encodedBuffer = Array.Empty<char>();
-
-            while (textSpan.Length > 0)
-            {
-                if (encodedBuffer.Length == 0)
+                if (rentedBuffer is not null)
                 {
-                    if (rentedBuffer is not null)
-                    {
-                        ArrayPool<char>.Shared.Return(rentedBuffer);
-                    }
-
-                    // TODO: What size should this be?
-                    var rentedSpanSize = Math.Min(1024, textSpan.Length * 2);
-                    rentedBuffer = ArrayPool<char>.Shared.Rent(rentedSpanSize);
-                    encodedBuffer = rentedBuffer;
+                    ArrayPool<char>.Shared.Return(rentedBuffer);
                 }
 
-                // Encode to rented buffer
-                encodeStatus = HtmlEncoder.Default.Encode(textSpan, encodedBuffer, out int charsConsumed, out int charsWritten);
-
-                // Write encoded chars to the writer
-                Span<char> encoded = encodedBuffer[..charsWritten];
-                WriteHtml(bufferWriter, encoded);
-
-                textSpan = textSpan[charsConsumed..];
-                encodedBuffer = encodedBuffer[charsWritten..];
+                // TODO: What size should this be?
+                var rentedSpanSize = Math.Min(1024, textSpan.Length * 2);
+                rentedBuffer = ArrayPool<char>.Shared.Rent(rentedSpanSize);
+                encodedBuffer = rentedBuffer;
             }
 
-            if (rentedBuffer is not null)
-            {
-                ArrayPool<char>.Shared.Return(rentedBuffer);
-            }
+            // Encode to rented buffer
+            encodeStatus = HtmlEncoder.Default.Encode(textSpan, encodedBuffer, out int charsConsumed, out int charsWritten);
 
-            if (encodeStatus != OperationStatus.Done)
-            {
-                throw new InvalidOperationException("Bad math");
-            }
+            // Write encoded chars to the writer
+            Span<char> encoded = encodedBuffer[..charsWritten];
+            WriteHtml(bufferWriter, encoded);
+
+            textSpan = textSpan[charsConsumed..];
+            encodedBuffer = encodedBuffer[charsWritten..];
+        }
+
+        if (rentedBuffer is not null)
+        {
+            ArrayPool<char>.Shared.Return(rentedBuffer);
+        }
+
+        if (encodeStatus != OperationStatus.Done)
+        {
+            throw new InvalidOperationException("Bad math");
         }
     }
 
     private static void WriteSmall(IBufferWriter<byte> bufferWriter, ReadOnlySpan<char> textSpan)
     {
-        var bufferSize = textSpan.Length * 2;
-        Span<char> encodedBuffer = stackalloc char[bufferSize];
+        Span<char> encodedBuffer = stackalloc char[256];
 
         // Encode to buffer
         var encodeStatus = HtmlEncoder.Default.Encode(textSpan, encodedBuffer, out int charsConsumed, out int charsWritten);
@@ -80,11 +81,13 @@ public static class BufferWriterExtensions
 
     public static void WriteHtml(this IBufferWriter<byte> bufferWriter, string? encoded)
     {
-        if (!string.IsNullOrEmpty(encoded))
+        if (string.IsNullOrEmpty(encoded))
         {
-            ReadOnlySpan<char> textSpan = encoded;
-            WriteHtml(bufferWriter, textSpan);
+            return;
         }
+
+        ReadOnlySpan<char> textSpan = encoded;
+        WriteHtml(bufferWriter, textSpan);
     }
 
     private static void WriteHtml(IBufferWriter<byte> bufferWriter, ReadOnlySpan<char> encoded)
