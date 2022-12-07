@@ -10,11 +10,11 @@ public static class BufferWriterExtensions
     {
         if (!string.IsNullOrEmpty(text))
         {
-            var textSpan = text.AsSpan();
+            ReadOnlySpan<char> textSpan = text;
             var encodeStatus = OperationStatus.Done;
 
             char[]? rentedBuffer = null;
-            var encodedBuffer = Array.Empty<char>();
+            Span<char> encodedBuffer = Array.Empty<char>();
 
             while (textSpan.Length > 0)
             {
@@ -32,10 +32,10 @@ public static class BufferWriterExtensions
                 }
 
                 // Encode to rented buffer
-                encodeStatus = HtmlEncoder.Default.Encode(textSpan, (Span<char>)encodedBuffer, out int charsConsumed, out int charsWritten);
+                encodeStatus = HtmlEncoder.Default.Encode(textSpan, encodedBuffer, out int charsConsumed, out int charsWritten);
 
                 // Write encoded chars to the writer
-                var encoded = encodedBuffer.AsSpan()[..charsWritten];
+                Span<char> encoded = encodedBuffer[..charsWritten];
                 WriteHtml(bufferWriter, encoded);
 
                 textSpan = textSpan[charsConsumed..];
@@ -58,14 +58,14 @@ public static class BufferWriterExtensions
     {
         if (!string.IsNullOrEmpty(encoded))
         {
-            var textSpan = encoded.AsSpan();
+            ReadOnlySpan<char> textSpan = encoded;
             WriteHtml(bufferWriter, textSpan);
         }
     }
 
     private static void WriteHtml(IBufferWriter<byte> bufferWriter, ReadOnlySpan<char> encoded)
     {
-        var writerSpan = bufferWriter.GetSpan();
+        Span<byte> writerSpan = bufferWriter.GetSpan();
         var status = OperationStatus.Done;
 
         while (encoded.Length > 0)
