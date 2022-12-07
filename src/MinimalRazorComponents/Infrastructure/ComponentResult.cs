@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using System.Buffers;
+using System.IO.Pipelines;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http.Extensions;
 using MinimalRazorComponents.Infrastructure;
 
@@ -27,6 +29,12 @@ public class ComponentResult<TComponent> : IResult
         httpContext.Response.ContentType = "text/html";
 
         var loggerFactory = httpContext.RequestServices.GetRequiredService<ILoggerFactory>();
+        var navigationManager = httpContext.RequestServices.GetRequiredService<NavigationManager>();
+        if (navigationManager is HttpContextNavigationManager httpContextNavigationManager)
+        {
+            httpContextNavigationManager.Initialize(httpContext);
+        }
+
         using var renderer = new HtmlRenderer(httpContext.RequestServices, loggerFactory);
 
         var initialParameters = _parameters is null
@@ -35,13 +43,11 @@ public class ComponentResult<TComponent> : IResult
 
         var bufferWriter = httpContext.Response.BodyWriter;
         var request = httpContext.Request;
-        var baseUri = UriHelper.BuildAbsolute(request.Scheme, request.Host, request.PathBase);
-        var currentUri = UriHelper.BuildAbsolute(request.Scheme, request.Host, request.PathBase, request.Path, request.QueryString);
         var allowNavigation = !httpContext.Response.HasStarted;
         var user = httpContext.User;
 
         var redirectToUrl = await renderer.Dispatcher.InvokeAsync(() =>
-            renderer.RenderComponentAsync<TComponent>(initialParameters, bufferWriter, baseUri, currentUri, allowNavigation, user));
+            renderer.RenderComponentAsync<TComponent>(initialParameters, bufferWriter, allowNavigation, user));
 
         if (redirectToUrl is not null)
         {

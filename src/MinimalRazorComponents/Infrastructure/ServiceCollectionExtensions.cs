@@ -17,7 +17,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddRazorComponents(this IServiceCollection services)
     {
         services.TryAddScoped<ComponentStatePersistenceManager>();
-        services.TryAddScoped<NavigationManager, HttpNavigationManager>();
+        services.TryAddScoped<NavigationManager, HttpContextNavigationManager>();
         services.TryAddScoped<AuthenticationStateProvider, ServerAuthenticationStateProvider>();
 
         return services;
