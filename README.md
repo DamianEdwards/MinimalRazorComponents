@@ -62,7 +62,7 @@ app.Run();
   - Are components assumed to be universal (server or client) by default and thus require explicit opting in to server or client behavior?
   - How to declare a component as server or client?
     - Filename suffix, e.g. MyComponent.client.razor vs. MyComponent.server.razor?
-    - New direct, e.g. @client vs. @server?
+    - New directive, e.g. @client vs. @server?
     - Attribute, e.g. @attribute [ClientComponent] vs. @attribute [ServerComponent]?
   - I'd assume design/compile-time errors with regards to components trying to do things their stated hosting type doesn't allow, e.g. can only handle client-interaction events in client or "connected" components, can only access server-domain services in server components, etc.
   - How does DI work in this world? Are services logically declared in different "domains" (client vs. server vs. universal)?
