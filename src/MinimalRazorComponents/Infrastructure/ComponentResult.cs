@@ -25,6 +25,7 @@ public class ComponentResult<TComponent> : IResult
         httpContext.Response.StatusCode = 200;
         httpContext.Response.ContentType = "text/html; charset=UTF-8";
 
+        // PERF: ASP.NET Core 8 fixes issue in Renderer base class ctor that results in allocations for ILogger<T> creation
         var loggerFactory = httpContext.RequestServices.GetRequiredService<ILoggerFactory>();
         var navigationManager = httpContext.RequestServices.GetRequiredService<NavigationManager>();
         if (navigationManager is HttpContextNavigationManager httpContextNavigationManager)

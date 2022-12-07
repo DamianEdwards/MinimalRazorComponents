@@ -13,6 +13,12 @@ public static class BufferWriterExtensions
             ReadOnlySpan<char> textSpan = text;
             var encodeStatus = OperationStatus.Done;
 
+            if (textSpan.Length <= 256)
+            {
+                WriteSmall(bufferWriter, textSpan);
+                return;
+            }
+
             char[]? rentedBuffer = null;
             Span<char> encodedBuffer = Array.Empty<char>();
 
@@ -51,6 +57,24 @@ public static class BufferWriterExtensions
             {
                 throw new InvalidOperationException("Bad math");
             }
+        }
+    }
+
+    private static void WriteSmall(IBufferWriter<byte> bufferWriter, ReadOnlySpan<char> textSpan)
+    {
+        var bufferSize = textSpan.Length * 2;
+        Span<char> encodedBuffer = stackalloc char[bufferSize];
+
+        // Encode to buffer
+        var encodeStatus = HtmlEncoder.Default.Encode(textSpan, encodedBuffer, out int charsConsumed, out int charsWritten);
+
+        // Write encoded chars to the writer
+        Span<char> encoded = encodedBuffer[..charsWritten];
+        WriteHtml(bufferWriter, encoded);
+
+        if (encodeStatus != OperationStatus.Done)
+        {
+            throw new InvalidOperationException("Bad math");
         }
     }
 
