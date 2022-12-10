@@ -15,6 +15,6 @@ public static class ResultsComponentExtensions
     public static IResult Component<TComponent>(this IResultExtensions resultExtensions, object parameters)
         where TComponent : IComponent
     {
-        return new ComponentResult<TComponent>() { Parameters = HtmlHelper.ObjectToDictionary(parameters)};
+        return new ComponentResult<TComponent>() { Parameters = HtmlHelper.ObjectToDictionary(parameters).AsReadOnly() };
     }
 }

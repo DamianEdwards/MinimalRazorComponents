@@ -1,5 +1,7 @@
 ﻿@inject LinkGenerator Links
 
+@using Microsoft.AspNetCore.Components.Routing;
+
 <!-- Fixed navbar -->
 <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark">
     <div class="container-fluid">
@@ -10,19 +12,19 @@
         <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav me-auto mb-2 mb-md-0">
                 <li class="nav-item">
-                    <a class="nav-link" aria-current="page" href="/">Home</a>
+                    <NavLink class="nav-link" href="/">Home</NavLink>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/about">About</a>
+                    <NavLink class="nav-link" href="/about">About</NavLink>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="@(Links.GetPathByComponent<Big>())">Big Page</a>
+                    <ComponentNavLink class="nav-link" TComponent="Big">Big Page</ComponentNavLink>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="@(Links.GetPathByComponent<Form>())">Form</a>
+                    <ComponentNavLink class="nav-link" TComponent="Form">Form</ComponentNavLink>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="@(Links.GetPathByComponent<ClientApp>())">Client Component</a>
+                    <ComponentNavLink class="nav-link" TComponent="ClientApp">Client Component</ComponentNavLink>
                 </li>
             </ul>
             @*<form class="d-flex" role="search">

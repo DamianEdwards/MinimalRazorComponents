@@ -1,13 +1,13 @@
-﻿<LayoutView Layout="typeof(Layout)">
-    <h1 class="mt-2">Hello World Component</h1>
+﻿@layout MainLayout
 
-    <p>This was rendered from a Razor Component!</p>
+<h1 class="mt-2">Hello World Component</h1>
 
-    @if (Message is not null)
-    {
-        <p>@Message</p>
-    }
-</LayoutView>
+<p>This was rendered from a Razor Component!</p>
+
+@if (Message is not null)
+{
+    <p>@Message</p>
+}
 
 @code {
     [Parameter]

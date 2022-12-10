@@ -21,7 +21,10 @@ public static class MapComponentExtensions
 
         // Super hack, using the component itself as the object that RequestDelegateFactory binds to & then passing it to the renderer as the object
         // to get parameters from.
-        endpointRouteBuilder.Map(mapRoutePattern, ([AsParameters]T component) => Results.Extensions.Component<T>(component))
+        //endpointRouteBuilder.Map(mapRoutePattern, ([AsParameters] T component) => Results.Extensions.Component<T>(component))
+        //    .WithName(ComponentName<T>.Name);
+
+        endpointRouteBuilder.Map(mapRoutePattern, () => Results.Extensions.Component<T>())
             .WithName(ComponentName<T>.Name);
 
         return endpointRouteBuilder;
@@ -30,7 +33,7 @@ public static class MapComponentExtensions
     public static IEndpointRouteBuilder MapComponent(this IEndpointRouteBuilder endpointRouteBuilder, Type componentType, string? routePattern = null)
     {
         var mapComponentGeneric = _mapComponentMethod.MakeGenericMethod(componentType);
-        mapComponentGeneric.Invoke(null, new object? [] { endpointRouteBuilder, routePattern });
+        mapComponentGeneric.Invoke(null, new object?[] { endpointRouteBuilder, routePattern });
         return endpointRouteBuilder;
     }
 

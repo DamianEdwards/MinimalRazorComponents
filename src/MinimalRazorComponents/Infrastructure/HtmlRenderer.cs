@@ -45,6 +45,8 @@ internal sealed class HtmlRenderer : Renderer
         bool allowNavigation,
         ClaimsPrincipal? user = null)
     {
+
+
         var component = InstantiateComponent(componentType);
         var componentId = AssignRootComponentId(component);
 
@@ -132,7 +134,7 @@ internal sealed class HtmlRenderer : Renderer
 
         if (isClient)
         {
-            PrerenderChildClientComponent(context, ref frame);
+            PrerenderChildClientComponent(context, ref frame, frames, position);
         }
         else
         {
@@ -142,13 +144,14 @@ internal sealed class HtmlRenderer : Renderer
         return position + frame.ComponentSubtreeLength;
     }
 
-    private void PrerenderChildClientComponent(HtmlRenderingContext context, ref RenderTreeFrame frame)
+    private void PrerenderChildClientComponent(HtmlRenderingContext context, ref RenderTreeFrame frame, ArrayRange<RenderTreeFrame> frames, int position)
     {
         var component = frame.Component;
         var componentType = component.GetType();
 
-        // TODO: How to get the parameters from the parent component here?
-        var marker = WebAssemblyComponentSerializer.SerializeInvocation(componentType, ParameterView.Empty, prerendered: true);
+        // Get the parameters from the parent component
+        var parameters = GetComponentParameters(frames, position);
+        var marker = WebAssemblyComponentSerializer.SerializeInvocation(componentType, parameters, prerendered: true);
         WebAssemblyComponentSerializer.AppendPreamble(context.Writer, marker);
 
         try
@@ -177,6 +180,27 @@ internal sealed class HtmlRenderer : Renderer
         context.RequiresClientComponentScripts = true;
     }
 
+    private static ParameterView GetComponentParameters(ArrayRange<RenderTreeFrame> frames, int ownerIndex)
+    {
+        var ownerDescendantsEndIndexExcl = ownerIndex + frames.Array[ownerIndex].ElementSubtreeLength;
+        var attributeFramesStartIndex = ownerIndex + 1;
+        var attributeFramesEndIndexExcl = attributeFramesStartIndex;
+
+        Dictionary<string, object?>? parameters = null;
+
+        while (attributeFramesEndIndexExcl < ownerDescendantsEndIndexExcl && frames.Array[attributeFramesEndIndexExcl].FrameType == RenderTreeFrameType.Attribute)
+        {
+            var parameterFrame = frames.Array[attributeFramesEndIndexExcl];
+            parameters ??= new();
+            parameters.Add(parameterFrame.AttributeName, parameterFrame.AttributeValue);
+            attributeFramesEndIndexExcl++;
+        }
+
+        return parameters is null
+            ? ParameterView.Empty
+            : ParameterView.FromDictionary(parameters);
+    }
+
     private void InitializeStandardComponentServices(HtmlRenderingContext htmlRenderingContext)
     {
         // This might not be the first component in the request we are rendering, so
@@ -202,7 +226,7 @@ internal sealed class HtmlRenderer : Renderer
             // It's important that this is initialized since a component might try to restore state during prerendering
             // (which will obviously not work, but should not fail)
             var componentApplicationLifetime = serviceProvider.GetRequiredService<ComponentStatePersistenceManager>();
-            
+
             // This is actually sync as it delegates to calling the store passed in which is the implementation below
             componentApplicationLifetime.RestoreStateAsync(new PrerenderComponentApplicationStore()).GetAwaiter().GetResult();
         }

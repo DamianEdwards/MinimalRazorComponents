@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Diagnostics;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
 
@@ -6,6 +7,10 @@ namespace MinimalRazorComponents.Infrastructure;
 
 public static class BufferWriterExtensions
 {
+    private const int SmallWriteByteSize = 256;
+    private const int SmallWriteCharSize = SmallWriteByteSize / 2;
+    private const int RentedCharArrayMaxSize = 1024;
+
     public static void Write(this IBufferWriter<byte> bufferWriter, string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -16,7 +21,7 @@ public static class BufferWriterExtensions
         ReadOnlySpan<char> textSpan = text;
         var encodeStatus = OperationStatus.Done;
 
-        if (textSpan.Length <= 128)
+        if (textSpan.Length <= SmallWriteCharSize)
         {
             WriteSmall(bufferWriter, textSpan);
             return;
@@ -35,7 +40,7 @@ public static class BufferWriterExtensions
                 }
 
                 // TODO: What size should this be?
-                var rentedSpanSize = Math.Min(1024, textSpan.Length * 2);
+                var rentedSpanSize = Math.Min(RentedCharArrayMaxSize, textSpan.Length * 2);
                 rentedBuffer = ArrayPool<char>.Shared.Rent(rentedSpanSize);
                 encodedBuffer = rentedBuffer;
             }
@@ -56,15 +61,12 @@ public static class BufferWriterExtensions
             ArrayPool<char>.Shared.Return(rentedBuffer);
         }
 
-        if (encodeStatus != OperationStatus.Done)
-        {
-            throw new InvalidOperationException("Bad math");
-        }
+        Debug.Assert(encodeStatus == OperationStatus.Done, "Bad math in IBufferWriter HTML writing extensions");
     }
 
     private static void WriteSmall(IBufferWriter<byte> bufferWriter, ReadOnlySpan<char> textSpan)
     {
-        Span<char> encodedBuffer = stackalloc char[256];
+        Span<char> encodedBuffer = stackalloc char[SmallWriteByteSize];
 
         // Encode to buffer
         var encodeStatus = HtmlEncoder.Default.Encode(textSpan, encodedBuffer, out int charsConsumed, out int charsWritten);
@@ -73,10 +75,7 @@ public static class BufferWriterExtensions
         Span<char> encoded = encodedBuffer[..charsWritten];
         WriteHtml(bufferWriter, encoded);
 
-        if (encodeStatus != OperationStatus.Done)
-        {
-            throw new InvalidOperationException("Bad math");
-        }
+        Debug.Assert(encodeStatus == OperationStatus.Done, "Bad math in IBufferWriter HTML writing extensions");
     }
 
     public static void WriteHtml(this IBufferWriter<byte> bufferWriter, string? encoded)
@@ -109,9 +108,6 @@ public static class BufferWriterExtensions
             bufferWriter.Advance(bytesWritten);
         }
 
-        if (status != OperationStatus.Done)
-        {
-            throw new InvalidOperationException("Bad math");
-        }
+        Debug.Assert(status == OperationStatus.Done, "Bad math in IBufferWriter HTML writing extensions");
     }
 }

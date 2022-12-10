@@ -9,7 +9,7 @@ var app = builder.Build();
 app.UseStaticFiles();
 app.UseBlazorFrameworkFiles();
 
-// Manually rendering components as "fragment" results
+// Manually mapping routes to components
 app.MapGet("/", () => Results.Extensions.Component<HelloWorld>(new { Message = "Hello from Minimal APIs" }));
 app.MapGet("/about", () => Results.Extensions.Component<About>());
 

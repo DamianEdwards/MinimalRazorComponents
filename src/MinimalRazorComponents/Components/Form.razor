@@ -1,55 +1,66 @@
 ﻿@page "/form"
-@layout Layout
+@layout MainLayout
 
-@using Microsoft.AspNetCore.Mvc;
+<h1 class="mt-2">Form Handling</h1>
 
-<LayoutView Layout="typeof(Layout)">
-    <h1 class="mt-2">Form Handling</h1>
+<p>Fill out this form</p>
 
-    <p>Fill out this form</p>
+<form method="post">
+    <div class="mb-3">
+        <label for="email" class="form-label">Email address</label>
+        <input type="email" name="email" value="@Email" class="form-control" id="email" aria-describedby="emailHelp" />
+        <div id="emailHelp" class="form-text">We'll never share your email with anyone else.</div>
+    </div>
+    <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <input type="password" name="password" value="@Password" class="form-control" id="password" />
+    </div>
+    <div class="mb-3 form-check">
+        <input type="checkbox" name="check" value="true" checked="@Check" class="form-check-input" id="check" />
+        <label class="form-check-label" for="check">Check me out</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Submit</button>
+</form>
 
-    <form method="get">
-        <div class="mb-3">
-            <label for="email" class="form-label">Email address</label>
-            <input type="email" name="email" value="@Email" class="form-control" id="email" aria-describedby="emailHelp" />
-            <div id="emailHelp" class="form-text">We'll never share your email with anyone else.</div>
-        </div>
-        <div class="mb-3">
-            <label for="password" class="form-label">Password</label>
-            <input type="password" name="password" value="@Password" class="form-control" id="password" />
-        </div>
-        <div class="mb-3 form-check">
-            <input type="checkbox" name="check" value="true" checked="@Check" class="form-check-input" id="check" />
-            <label class="form-check-label" for="check">Check me out</label>
-        </div>
-        <button type="submit" class="btn btn-primary">Submit</button>
-    </form>
 
-    @if (!string.IsNullOrEmpty(message))
-    {
-        <p>
-            @message
-        </p>
-    }
-</LayoutView>
+@if (hasFormValues)
+{
+    <dl class="mt-2">
+        @if (!string.IsNullOrEmpty(Email))
+        {
+            <dt>@nameof(Email)</dt>
+            <dd>@Email</dd>
+        }
+        @if (!string.IsNullOrEmpty(Password))
+        {
+            <dt>@nameof(Password)</dt>
+            <dd>@Password</dd>
+        }
+        @if (Check.HasValue)
+        {
+            <dt>@nameof(Check)</dt>
+            <dd>@Check</dd>
+        }
+    </dl>
+}
 
 @code {
-    string? message;
+    bool hasFormValues;
 
     [Parameter]
-    [FromQuery]
+    [SupplyParameterFromForm]
     public string? Email { get; set; }
 
     [Parameter]
-    [FromQuery]
+    [SupplyParameterFromForm]
     public string? Password { get; set; }
 
     [Parameter]
-    [FromQuery]
+    [SupplyParameterFromForm]
     public bool? Check { get; set; }
 
     protected override void OnParametersSet()
     {
-        message = !string.IsNullOrEmpty(Email) ? $"Email = {Email}" : "No values";
+        hasFormValues = !string.IsNullOrEmpty(Email) || !string.IsNullOrEmpty(Password) || Check.HasValue;
     }
 }
