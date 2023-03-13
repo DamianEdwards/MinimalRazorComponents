@@ -1,3 +1,7 @@
+# NOTE: Check out [RazorSlices](https://github.com/DamianEdwards/RazorSlices) to see where this experiment eventually landed
+
+I'll leave this repo here as the code might still be interesting to some folks, but for returning Razor-templated HTML from ASP.NET Core minimal APIs and middleware, I recommend you use look at my [RazorSlices](https://github.com/DamianEdwards/RazorSlices) project/package.
+
 # Minimal Razor Components
 
 ## What is this?
